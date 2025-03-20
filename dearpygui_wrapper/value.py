@@ -1,10 +1,8 @@
 import logging
 from typing import Any, Callable
 
-from dearpygui_wrapper import dpg
+from dearpygui_wrapper import DpgTag, dpg
 from dearpygui_wrapper.base import ValueObject
-
-DpgTag = int | str
 
 logger = logging.getLogger('dgp_wrapper')
 

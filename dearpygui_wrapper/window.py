@@ -10,6 +10,7 @@ logger = logging.getLogger('dgp_wrapper')
 class Window(Object):
     is_instance = True
     generator = staticmethod(dpg.add_window)
+    primary = False
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, width: int = 0, height: int = 0, indent: int = -1, show: bool = True, pos: list[int] | tuple[int, ...] = [], delay_search: bool = False, min_size: list[int] | tuple[int, ...] = [100, 100], max_size: list[int] | tuple[int, ...] = [30000, 30000], menubar: bool = False, collapsed: bool = False, autosize: bool = False, no_resize: bool = False, unsaved_document: bool = False, no_title_bar: bool = False, no_move: bool = False, no_scrollbar: bool = False, no_collapse: bool = False, horizontal_scrollbar: bool = False, no_focus_on_appearing: bool = False, no_bring_to_front_on_focus: bool = False, no_close: bool = False, no_background: bool = False, modal: bool = False, popup: bool = False, no_saved_settings: bool = False, no_open_over_existing_popup: bool = True, no_scroll_with_mouse: bool = False, on_close: Callable | None = None):
         """	 Creates a new window for following items to be added to.
@@ -52,9 +53,9 @@ class Window(Object):
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'indent': indent, 'show': show, 'pos': pos, 'delay_search': delay_search, 'min_size': min_size, 'max_size': max_size, 'menubar': menubar, 'collapsed': collapsed, 'autosize': autosize, 'no_resize': no_resize, 'unsaved_document': unsaved_document, 'no_title_bar': no_title_bar, 'no_move': no_move, 'no_scrollbar': no_scrollbar, 'no_collapse': no_collapse, 'horizontal_scrollbar': horizontal_scrollbar, 'no_focus_on_appearing': no_focus_on_appearing, 'no_bring_to_front_on_focus': no_bring_to_front_on_focus, 'no_close': no_close, 'no_background': no_background, 'modal': modal, 'popup': popup, 'no_saved_settings': no_saved_settings, 'no_open_over_existing_popup': no_open_over_existing_popup, 'no_scroll_with_mouse': no_scroll_with_mouse, 'on_close': on_close}
         super().__init__(**kwargs)
 
-    def build(self, primary=False, *args, **kwargs) -> 'Window':
+    def build(self, *args, **kwargs) -> 'Window':
         super().build(None, *args, **kwargs)
-        dpg.set_primary_window(self.tag, primary)
+        dpg.set_primary_window(self.tag, self.primary)
 
         return self
 
