@@ -215,11 +215,11 @@ class NodeEditor(Manager):
             id (Union[int, str], optional): (deprecated)
         """
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'parent': parent, 'before': before, 'callback': callback, 'show': show, 'filter_key': filter_key, 'delay_search': delay_search, 'tracked': tracked, 'track_offset': track_offset, 'delink_callback': delink_callback, 'menubar': menubar, 'minimap': minimap, 'minimap_location': minimap_location}
-        kwargs.update({'callback': callback or self.__link_callback})
-        kwargs.update({'delink_callback': delink_callback or self.__delink_callback})
+        kwargs.update({'callback': callback or self.link_callback})
+        kwargs.update({'delink_callback': delink_callback or self.delink_callback})
         super().__init__(**kwargs)
 
-    def __link_callback(self, sener: DpgTag, app_data: tuple[DpgTag, DpgTag]):
+    def link_callback(self, sener: DpgTag, app_data: tuple[DpgTag, DpgTag]):
         """ Callback for link.
 
         Args:
@@ -240,7 +240,7 @@ class NodeEditor(Manager):
         # inject link value to output attribute
         link.in_attr.object.set_values(values)
 
-    def __delink_callback(self, sender: DpgTag, app_data: DpgTag):
+    def delink_callback(self, sender: DpgTag, app_data: DpgTag):
         """ Callback for delink.
 
         Args:
