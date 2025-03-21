@@ -150,21 +150,8 @@ class Link(Object):
             Self: own instance.
         """
         super().build(parent, *args, manager=manager, **kwargs)
-        self.in_attr = cast(NodeAttribute, manager[self.args[0]])
-        self.out_attr = cast(NodeAttribute, manager[self.args[1]])
-
-        return self
-
-    def update(self, app_data: Any) -> Self:
-        """ Update the link.
-
-        Args:
-            app_data (Any): data.
-
-        Returns:
-            Self: own instance.
-        """
-        self.out_attr.object.value = app_data
+        self.out_attr = cast(NodeAttribute, manager[self.args[0]]).add_link(self.tag)
+        self.in_attr = cast(NodeAttribute, manager[self.args[1]]).add_link(self.tag)
 
         return self
 
@@ -239,12 +226,19 @@ class NodeEditor(Manager):
             sener (DpgTag): own tag.
             app_data (tuple[DpgTag, DpgTag]): input attr tag and output attr tag.
         """
-        in_attr: NodeAttribute = cast(NodeAttribute, self.manager[app_data[0]])
         parent = self.manager[sener]
         link = Link(*app_data)\
-            .build(parent, manager=self.manager)\
-            .update(in_attr.object.value)
-        in_attr.add_link(link.tag)
+            .build(parent, manager=self.manager)
+        # get inject value
+        # ### out_attr1 -+-link_id-> [in_attr]
+        # ###            |
+        # ### out_attr2 -+
+        values = [
+            cast(Link, self.manager[link_id]).out_attr.object.value
+            for link_id in link.in_attr.links
+        ]
+        # inject link value to output attribute
+        link.in_attr.object.set_values(values)
 
     def __delink_callback(self, sender: DpgTag, app_data: DpgTag):
         """ Callback for delink.
@@ -253,12 +247,11 @@ class NodeEditor(Manager):
             sender (DpgTag): own tag.
             app_data (DpgTag): link tag.
         """
-        dpg.delete_item(app_data)
-        del self.manager[app_data]
         for attr in self.manager.values():
             if isinstance(attr, NodeAttribute) and attr.exists_link(app_data):
                 attr.remove_link(app_data)
-                break
+        dpg.delete_item(app_data)
+        del self.manager[app_data]
 
     def update_links(self, sender: DpgTag, app_data: Any) -> Self:
         """ Update links.
@@ -270,10 +263,19 @@ class NodeEditor(Manager):
         Returns:
             Self: own instance.
         """
-        attr = cast(NodeAttribute, self.manager[sender].parent)
-        for link_id in attr.links:
-            link = cast(Link, self.manager[link_id])
-            link.update(app_data)
+        out_attr = cast(NodeAttribute, self.manager[sender].parent)
+        for out_link_id in out_attr.links:
+            # get inject value
+            # ### [out_attr] -out_link_id-+-in_link_id> in_attr1
+            # ###                         |
+            # ###                         +-in_link_id> in_attr2
+            in_attr = cast(Link, self.manager[out_link_id]).in_attr
+            values = [
+                cast(Link, self.manager[in_link_id]).out_attr.object.value
+                for in_link_id in in_attr.links
+            ]
+            # inject link value to output attribute
+            in_attr.object.set_values(values)
         return self
 
     def clear_selected_links(self):

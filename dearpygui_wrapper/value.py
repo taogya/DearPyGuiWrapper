@@ -41,6 +41,14 @@ class Text(ValueObject):
         kwargs = {'default_value': default_value, 'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'indent': indent, 'parent': parent, 'before': before, 'source': source, 'payload_type': payload_type, 'drag_callback': drag_callback, 'drop_callback': drop_callback, 'show': show, 'pos': pos, 'filter_key': filter_key, 'tracked': tracked, 'track_offset': track_offset, 'wrap': wrap, 'bullet': bullet, 'color': color, 'show_label': show_label}
         super().__init__(**kwargs)
 
+    def set_values(self, values: list[Any]):
+        """ Set value of the object.
+
+        Args:
+            values (list[Any]): value to set.
+        """
+        self.value = '\n'.join(map(str, values))
+
 
 class InputText(ValueObject):
     is_instance = True
@@ -92,3 +100,11 @@ class InputText(ValueObject):
         """
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'indent': indent, 'parent': parent, 'before': before, 'source': source, 'payload_type': payload_type, 'callback': callback, 'drag_callback': drag_callback, 'drop_callback': drop_callback, 'show': show, 'enabled': enabled, 'pos': pos, 'filter_key': filter_key, 'tracked': tracked, 'track_offset': track_offset, 'default_value': default_value, 'hint': hint, 'multiline': multiline, 'no_spaces': no_spaces, 'uppercase': uppercase, 'tab_input': tab_input, 'decimal': decimal, 'hexadecimal': hexadecimal, 'readonly': readonly, 'password': password, 'scientific': scientific, 'on_enter': on_enter, 'auto_select_all': auto_select_all, 'ctrl_enter_for_new_line': ctrl_enter_for_new_line, 'no_horizontal_scroll': no_horizontal_scroll, 'always_overwrite': always_overwrite, 'no_undo_redo': no_undo_redo, 'escape_clears_all': escape_clears_all}
         super().__init__(**kwargs)
+
+    def set_values(self, values: list[Any]):
+        """ Set value of the object.
+
+        Args:
+            values (list[Any]): value to set.
+        """
+        self.value = '\n'.join(map(str, values))
