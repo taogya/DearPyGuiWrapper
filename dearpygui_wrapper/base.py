@@ -69,6 +69,14 @@ class ValueObject(Object):
         """
         dpg.set_value(self.tag, value)
 
+    def set_values(self, values: list[Any]):
+        """ Set value of the object.
+
+        Args:
+            values (list[Any]): value to set.
+        """
+        raise NotImplementedError
+
 
 class Container(Object):
     def __init__(self, *args, **kwargs):
