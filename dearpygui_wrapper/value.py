@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Callable
 
-from dearpygui_wrapper import DpgTag, dpg
+from dearpygui_wrapper import DpgTag, dpg_org
 from dearpygui_wrapper.base import ValueObject
 
 logger = logging.getLogger('dgp_wrapper')
@@ -9,7 +9,7 @@ logger = logging.getLogger('dgp_wrapper')
 
 class Text(ValueObject):
     is_instance = True
-    generator = staticmethod(dpg.add_text)
+    generator = staticmethod(dpg_org.add_text)
 
     def __init__(self, default_value: str = '', *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, indent: int = -1, parent: DpgTag = 0, before: DpgTag = 0, source: DpgTag = 0, payload_type: str = '$$DPG_PAYLOAD', drag_callback: Callable | None = None, drop_callback: Callable | None = None, show: bool = True, pos: list[int] | tuple[int, ...] = [], filter_key: str = '', tracked: bool = False, track_offset: float = 0.5, wrap: int = -1, bullet: bool = False, color: list[int] | tuple[int, ...] = (-255, 0, 0, 255), show_label: bool = False):
         """	 Adds text. Text can have an optional label that will display to the right of the text.
@@ -52,7 +52,7 @@ class Text(ValueObject):
 
 class InputText(ValueObject):
     is_instance = True
-    generator = staticmethod(dpg.add_input_text)
+    generator = staticmethod(dpg_org.add_input_text)
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, width: int = 0, height: int = 0, indent: int = -1, parent: DpgTag = 0, before: DpgTag = 0, source: DpgTag = 0, payload_type: str = '$$DPG_PAYLOAD', callback: Callable | None = None, drag_callback: Callable | None = None, drop_callback: Callable | None = None, show: bool = True, enabled: bool = True, pos: list[int] | tuple[int, ...] = [], filter_key: str = '', tracked: bool = False, track_offset: float = 0.5, default_value: str = '', hint: str = '', multiline: bool = False, no_spaces: bool = False, uppercase: bool = False, tab_input: bool = False, decimal: bool = False, hexadecimal: bool = False, readonly: bool = False, password: bool = False, scientific: bool = False, on_enter: bool = False, auto_select_all: bool = False, ctrl_enter_for_new_line: bool = False, no_horizontal_scroll: bool = False, always_overwrite: bool = False, no_undo_redo: bool = False, escape_clears_all: bool = False):
         """	 Adds input for text.

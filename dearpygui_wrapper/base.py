@@ -1,9 +1,21 @@
 import logging
 from typing import Any, Self
 
-from dearpygui_wrapper import DpgTag, dpg
+from dearpygui_wrapper import DpgTag, dpg_org
 
 logger = logging.getLogger('dgp_wrapper')
+
+
+def get_tag(id: DpgTag) -> DpgTag:
+    """ Get tag of the object.
+
+    Args:
+        id (DpgTag): id of the object.
+
+    Returns:
+        DpgTag: tag of the object.
+    """
+    return dpg_org.get_item_alias(id) or id
 
 
 class Object:
@@ -44,10 +56,14 @@ class Object:
             self.kwargs.update({'parent': parent.tag})
 
         self.tag = self.generator(*self.args, **self.kwargs)
+
         if manager is not None:
             manager.update({self.tag: self})
 
         return self
+
+    def __str__(self) -> str:
+        return self.tag
 
 
 class ValueObject(Object):
@@ -58,7 +74,7 @@ class ValueObject(Object):
         Returns:
             Any: value of the object.
         """
-        return dpg.get_value(self.tag)
+        return dpg_org.get_value(self.tag)
 
     @value.setter
     def value(self, value: Any):
@@ -67,7 +83,7 @@ class ValueObject(Object):
         Args:
             value (Any): value to set.
         """
-        dpg.set_value(self.tag, value)
+        dpg_org.set_value(self.tag, value)
 
     def set_values(self, values: list[Any]):
         """ Set value of the object.
