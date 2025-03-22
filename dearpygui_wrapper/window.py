@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Callable, Self
 
-from dearpygui_wrapper import DpgTag, dpg
+from dearpygui_wrapper import DpgTag, dpg_org
 from dearpygui_wrapper.base import Container, Object
 
 logger = logging.getLogger('dgp_wrapper')
@@ -9,7 +9,7 @@ logger = logging.getLogger('dgp_wrapper')
 
 class Window(Object):
     is_instance = True
-    generator = staticmethod(dpg.add_window)
+    generator = staticmethod(dpg_org.add_window)
     primary = False
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, width: int = 0, height: int = 0, indent: int = -1, show: bool = True, pos: list[int] | tuple[int, ...] = [], delay_search: bool = False, min_size: list[int] | tuple[int, ...] = [100, 100], max_size: list[int] | tuple[int, ...] = [30000, 30000], menubar: bool = False, collapsed: bool = False, autosize: bool = False, no_resize: bool = False, unsaved_document: bool = False, no_title_bar: bool = False, no_move: bool = False, no_scrollbar: bool = False, no_collapse: bool = False, horizontal_scrollbar: bool = False, no_focus_on_appearing: bool = False, no_bring_to_front_on_focus: bool = False, no_close: bool = False, no_background: bool = False, modal: bool = False, popup: bool = False, no_saved_settings: bool = False, no_open_over_existing_popup: bool = True, no_scroll_with_mouse: bool = False, on_close: Callable | None = None):
@@ -55,14 +55,14 @@ class Window(Object):
 
     def build(self, *args, **kwargs) -> 'Window':
         super().build(None, *args, **kwargs)
-        dpg.set_primary_window(self.tag, self.primary)
+        dpg_org.set_primary_window(self.tag, self.primary)
 
         return self
 
 
 class ViewPort(Container):
     is_instance = True
-    generator = staticmethod(dpg.create_viewport)
+    generator = staticmethod(dpg_org.create_viewport)
 
     def __init__(self, *, title: str = 'Dear PyGui', small_icon: str = '', large_icon: str = '', width: int = 1280, height: int = 800, x_pos: int = 100, y_pos: int = 100, min_width: int = 250, max_width: int = 10000, min_height: int = 250, max_height: int = 10000, resizable: bool = True, vsync: bool = True, always_on_top: bool = False, decorated: bool = True, clear_color: list[float] | tuple[float, ...] = (0, 0, 0, 255), disable_close: bool = False):
         """ Creates a viewport. Viewports are required.
@@ -87,7 +87,7 @@ class ViewPort(Container):
             disable_close (bool, optional): Disables the viewport close button. can be used with set_exit_callback
         """
         self.kwargs = {'title': title, 'small_icon': small_icon, 'large_icon': large_icon, 'width': width, 'height': height, 'x_pos': x_pos, 'y_pos': y_pos, 'min_width': min_width, 'max_width': max_width, 'min_height': min_height, 'max_height': max_height, 'resizable': resizable, 'vsync': vsync, 'always_on_top': always_on_top, 'decorated': decorated, 'clear_color': clear_color, 'disable_close': disable_close}
-        dpg.create_context()
+        dpg_org.create_context()
         super().__init__(**self.kwargs)
 
     def build(self, minimized: bool = False, maximized: bool = False, **kwargs) -> Self:
@@ -100,13 +100,13 @@ class ViewPort(Container):
             Self: own instance.
         """
         super().build(None)
-        dpg.setup_dearpygui()
-        dpg.show_viewport(minimized=minimized, maximized=maximized)
-        dpg.start_dearpygui()
+        dpg_org.setup_dearpygui()
+        dpg_org.show_viewport(minimized=minimized, maximized=maximized)
+        dpg_org.start_dearpygui()
 
         return self
 
     def __del__(self):
         """ Destroy the viewport.
         """
-        dpg.destroy_context()
+        dpg_org.destroy_context()

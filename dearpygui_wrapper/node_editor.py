@@ -2,21 +2,21 @@ import logging
 from enum import IntEnum
 from typing import Any, Callable, Self, cast
 
-from dearpygui_wrapper import DpgTag, dpg
-from dearpygui_wrapper.base import Container, Manager, Object, ValueObject
+from dearpygui_wrapper import (Container, DpgTag, Manager, Object, ValueObject,
+                               dpg_org, get_tag)
 
 logger = logging.getLogger('dgp_wrapper')
 
 
 class NodeAttributeType(IntEnum):
-    STATIC = dpg.mvNode_Attr_Static
-    INPUT = dpg.mvNode_Attr_Input
-    OUTPUT = dpg.mvNode_Attr_Output
+    STATIC = dpg_org.mvNode_Attr_Static
+    INPUT = dpg_org.mvNode_Attr_Input
+    OUTPUT = dpg_org.mvNode_Attr_Output
 
 
 class NodeAttribute(Container):
     is_instance = True
-    generator = staticmethod(dpg.add_node_attribute)
+    generator = staticmethod(dpg_org.add_node_attribute)
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, indent: int = -1, parent: DpgTag = 0, before: DpgTag = 0, show: bool = True, filter_key: str = '', tracked: bool = False, track_offset: float = 0.5, attribute_type: int = 0, shape: int = 1, category: str = 'general'):
         """	 Adds a node attribute to a node.
@@ -119,7 +119,7 @@ class NodeAttribute(Container):
 
 class Link(Object):
     is_instance = True
-    generator = staticmethod(dpg.add_node_link)
+    generator = staticmethod(dpg_org.add_node_link)
 
     def __init__(self, attr_1: DpgTag, attr_2: DpgTag, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, parent: DpgTag = 0, show: bool = True):
         """	 Adds a node link between 2 node attributes.
@@ -158,7 +158,7 @@ class Link(Object):
 
 class Node(Container):
     is_instance = True
-    generator = staticmethod(dpg.add_node)
+    generator = staticmethod(dpg_org.add_node)
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, parent: DpgTag = 0, before: DpgTag = 0, payload_type: str = '$$DPG_PAYLOAD', drag_callback: Callable | None = None, drop_callback: Callable | None = None, show: bool = True, pos: list[int] | tuple[int, ...] = [], filter_key: str = '', delay_search: bool = False, tracked: bool = False, track_offset: float = 0.5, draggable: bool = True):
         """	 Adds a node to a node editor.
@@ -188,7 +188,7 @@ class Node(Container):
 
 class NodeEditor(Manager):
     is_instance = True
-    generator = staticmethod(dpg.add_node_editor)
+    generator = staticmethod(dpg_org.add_node_editor)
 
     def __init__(self, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, width: int = 0, height: int = 0, parent: DpgTag = 0, before: DpgTag = 0, callback: Callable | None = None, show: bool = True, filter_key: str = '', delay_search: bool = False, tracked: bool = False, track_offset: float = 0.5, delink_callback: Callable | None = None, menubar: bool = False, minimap: bool = False, minimap_location: int = 2):
         """	 Adds a node editor.
@@ -215,18 +215,42 @@ class NodeEditor(Manager):
             id (Union[int, str], optional): (deprecated)
         """
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'parent': parent, 'before': before, 'callback': callback, 'show': show, 'filter_key': filter_key, 'delay_search': delay_search, 'tracked': tracked, 'track_offset': track_offset, 'delink_callback': delink_callback, 'menubar': menubar, 'minimap': minimap, 'minimap_location': minimap_location}
-        kwargs.update({'callback': callback or self.link_callback})
-        kwargs.update({'delink_callback': delink_callback or self.delink_callback})
+        kwargs.update({'callback': callback or self.__link_callback})
+        kwargs.update({'delink_callback': delink_callback or self.__delink_callback})
         super().__init__(**kwargs)
 
-    def link_callback(self, sener: DpgTag, app_data: tuple[DpgTag, DpgTag]):
+    def __link_callback(self, sender: DpgTag, app_data: tuple[DpgTag, DpgTag]):
         """ Callback for link.
 
         Args:
-            sener (DpgTag): own tag.
+            sender (DpgTag): own tag.
             app_data (tuple[DpgTag, DpgTag]): input attr tag and output attr tag.
         """
-        parent = self.manager[sener]
+        # fix https://github.com/hoffstadt/DearPyGui/issues/2122
+        sender = get_tag(sender)
+        app_data = (get_tag(app_data[0]), get_tag(app_data[1]))
+        self.link_callback(sender, app_data)
+
+    def __delink_callback(self, sender: DpgTag, app_data: DpgTag):
+        """ Callback for delink.
+
+        Args:
+            sender (DpgTag): own tag.
+            app_data (DpgTag): link tag.
+        """
+        # fix https://github.com/hoffstadt/DearPyGui/issues/2122
+        sender = get_tag(sender)
+        app_data = get_tag(app_data)
+        self.delink_callback(sender, app_data)
+
+    def link_callback(self, sender: DpgTag, app_data: tuple[DpgTag, DpgTag]):
+        """ Callback for link.
+
+        Args:
+            sender (DpgTag): own tag.
+            app_data (tuple[DpgTag, DpgTag]): input attr tag and output attr tag.
+        """
+        parent = self.manager[sender]
         link = Link(*app_data)\
             .build(parent, manager=self.manager)
         # get inject value
@@ -247,10 +271,14 @@ class NodeEditor(Manager):
             sender (DpgTag): own tag.
             app_data (DpgTag): link tag.
         """
+        # fix https://github.com/hoffstadt/DearPyGui/issues/2122
+        sender = get_tag(sender)
+        app_data = get_tag(app_data)
+
         for attr in self.manager.values():
             if isinstance(attr, NodeAttribute) and attr.exists_link(app_data):
                 attr.remove_link(app_data)
-        dpg.delete_item(app_data)
+        dpg_org.delete_item(app_data)
         del self.manager[app_data]
 
     def update_links(self, sender: DpgTag, app_data: Any) -> Self:
@@ -281,12 +309,12 @@ class NodeEditor(Manager):
     def clear_selected_links(self):
         """ Clear selected links in the node editor.
         """
-        dpg.clear_selected_links(self.tag)
+        dpg_org.clear_selected_links(self.tag)
 
     def clear_selected_nodes(self):
         """ Clear selected nodes in the node editor
         """
-        dpg.clear_selected_nodes(self.tag)
+        dpg_org.clear_selected_nodes(self.tag)
 
     def get_selected_links(self) -> list[Link]:
         """ Get selected links in the node editor.
@@ -294,7 +322,7 @@ class NodeEditor(Manager):
         Returns:
             list[Link]: Selected links.
         """
-        link_ids = cast(list[DpgTag], dpg.get_selected_links(self.tag))
+        link_ids = cast(list[DpgTag], dpg_org.get_selected_links(self.tag))
         return [cast(Link, self.manager[link_id]) for link_id in link_ids]
 
     def get_selected_nodes(self) -> list[Node]:
@@ -303,5 +331,5 @@ class NodeEditor(Manager):
         Returns:
             list[Node]: Selected nodes.
         """
-        node_ids = cast(list[DpgTag], dpg.get_selected_nodes(self.tag))
+        node_ids = cast(list[DpgTag], dpg_org.get_selected_nodes(self.tag))
         return [cast(Node, self.manager[node_id]) for node_id in node_ids]
