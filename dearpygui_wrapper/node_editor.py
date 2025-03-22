@@ -229,7 +229,12 @@ class NodeEditor(Manager):
         # fix https://github.com/hoffstadt/DearPyGui/issues/2122
         sender = get_tag(sender)
         app_data = (get_tag(app_data[0]), get_tag(app_data[1]))
-        self.link_callback(sender, app_data)
+
+        parent = self.manager[sender]
+        link = Link(*app_data)\
+            .build(parent, manager=self.manager)
+
+        self.link_callback(link)
 
     def __delink_callback(self, sender: DpgTag, app_data: DpgTag):
         """ Callback for delink.
@@ -241,57 +246,41 @@ class NodeEditor(Manager):
         # fix https://github.com/hoffstadt/DearPyGui/issues/2122
         sender = get_tag(sender)
         app_data = get_tag(app_data)
-        self.delink_callback(sender, app_data)
 
-    def link_callback(self, sender: DpgTag, app_data: tuple[DpgTag, DpgTag]):
+        link = cast(Link, self.manager[app_data])
+        for attr in self.manager.values():
+            if isinstance(attr, NodeAttribute) and attr.exists_link(link.tag):
+                attr.remove_link(link.tag)
+        del self.manager[link.tag]
+        dpg_org.delete_item(link.tag)
+
+        self.delink_callback(link)
+
+    def link_callback(self, link: Link):
         """ Callback for link.
 
         Args:
-            sender (DpgTag): own tag.
-            app_data (tuple[DpgTag, DpgTag]): input attr tag and output attr tag.
+            link (Link): link object.
         """
-        parent = self.manager[sender]
-        link = Link(*app_data)\
-            .build(parent, manager=self.manager)
-        # get inject value
-        # ### out_attr1 -+-link_id-> [in_attr]
-        # ###            |
-        # ### out_attr2 -+
-        values = [
-            cast(Link, self.manager[link_id]).out_attr.object.value
-            for link_id in link.in_attr.links
-        ]
-        # inject link value to output attribute
-        link.in_attr.object.set_values(values)
+        pass
 
-    def delink_callback(self, sender: DpgTag, app_data: DpgTag):
+    def delink_callback(self, link: Link):
         """ Callback for delink.
 
         Args:
-            sender (DpgTag): own tag.
-            app_data (DpgTag): link tag.
+            link (Link): link object.
         """
-        # fix https://github.com/hoffstadt/DearPyGui/issues/2122
-        sender = get_tag(sender)
-        app_data = get_tag(app_data)
+        pass
 
-        for attr in self.manager.values():
-            if isinstance(attr, NodeAttribute) and attr.exists_link(app_data):
-                attr.remove_link(app_data)
-        dpg_org.delete_item(app_data)
-        del self.manager[app_data]
-
-    def update_links(self, sender: DpgTag, app_data: Any) -> Self:
-        """ Update links.
+    def inject_based_on_out_attr(self, out_attr: NodeAttribute) -> Self:
+        """ Inject where connected based on output attribute.
 
         Args:
-            sender (DpgTag): value object tag.
-            app_data (Any): data.
+            out_attr (NodeAttribute): output attribute.
 
         Returns:
             Self: own instance.
         """
-        out_attr = cast(NodeAttribute, self.manager[sender].parent)
         for out_link_id in out_attr.links:
             # get inject value
             # ### [out_attr] -out_link_id-+-in_link_id> in_attr1
@@ -302,8 +291,29 @@ class NodeEditor(Manager):
                 cast(Link, self.manager[in_link_id]).out_attr.object.value
                 for in_link_id in in_attr.links
             ]
-            # inject link value to output attribute
             in_attr.object.set_values(values)
+
+        return self
+
+    def inject_based_on_in_attr(self, in_attr: NodeAttribute) -> Self:
+        """ Inject where connected based on input attribute.
+
+        Args:
+            in_attr (NodeAttribute): input attribute.
+
+        Returns:
+            Self: own instance.
+        """
+        # get inject value
+        # ### out_attr1 -+-link_id-> [in_attr]
+        # ###            |
+        # ### out_attr2 -+
+        values = [
+            cast(Link, self.manager[link_id]).out_attr.object.value
+            for link_id in in_attr.links
+        ]
+        in_attr.object.set_values(values)
+
         return self
 
     def clear_selected_links(self):
