@@ -6,10 +6,13 @@
             "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
-            "program": "${workspaceFolder}/dearpygui_wrapper/main.py",
-            "cwd": "${workspaceFolder}/dearpygui_wrapper",
+            "program": "${workspaceFolder}/sample/node_editor.py",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${workspaceFolder}/sample",
             "justMyCode": false,
-            "args": [],
+            "args": []
         },
         {
             "name": "DebugMem",
@@ -18,13 +21,14 @@
             "console": "integratedTerminal",
             "program": "${workspaceFolder}/venv/bin/mprof",
             "env": {
-                "MPLBACKEND": "module://backend_interagg"
+                "MPLBACKEND": "module://backend_interagg",
+                "PYTHONPATH": "${workspaceFolder}"
             },
-            "cwd": "${workspaceFolder}/dearpygui_wrapper",
+            "cwd": "${workspaceFolder}/sample",
             "justMyCode": false,
             "args": [
                 "run",
-                "main.py"
+                "node_editor.py"
             ],
         },
         {
@@ -33,7 +37,10 @@
             "request": "launch",
             "console": "integratedTerminal",
             "program": "${workspaceFolder}/venv/bin/mprof",
-            "cwd": "${workspaceFolder}/dearpygui_wrapper",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${workspaceFolder}/sample",
             "justMyCode": false,
             "args": [
                 "plot"

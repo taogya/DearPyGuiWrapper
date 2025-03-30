@@ -1,6 +1,10 @@
 {
     // python path
     "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/dearpygui_wrapper",
+        "${workspaceFolder}/sample",
+    ],
     // format on save
     "editor.formatOnSave": true,
     // flake8

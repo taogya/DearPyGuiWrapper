@@ -56,6 +56,8 @@ class Window(Object):
     def build(self, *args, **kwargs) -> 'Window':
         super().build(None, *args, **kwargs)
         dpg_org.set_primary_window(self.tag, self.primary)
+        if self.primary:
+            logger.debug(f'[{self.__class__.__name__}] Set primary window {self}')
 
         return self
 
@@ -88,6 +90,7 @@ class ViewPort(Container):
         """
         self.kwargs = {'title': title, 'small_icon': small_icon, 'large_icon': large_icon, 'width': width, 'height': height, 'x_pos': x_pos, 'y_pos': y_pos, 'min_width': min_width, 'max_width': max_width, 'min_height': min_height, 'max_height': max_height, 'resizable': resizable, 'vsync': vsync, 'always_on_top': always_on_top, 'decorated': decorated, 'clear_color': clear_color, 'disable_close': disable_close}
         dpg_org.create_context()
+        logger.debug(f'[{self.__class__.__name__}] Created context')
         super().__init__(**self.kwargs)
 
     def build(self, minimized: bool = False, maximized: bool = False, **kwargs) -> Self:
@@ -101,12 +104,16 @@ class ViewPort(Container):
         """
         super().build(None)
         dpg_org.setup_dearpygui()
+        logger.debug(f'[{self.__class__.__name__}] Setup dearPyGui')
         dpg_org.show_viewport(minimized=minimized, maximized=maximized)
+        logger.debug(f'[{self.__class__.__name__}] Show viewport {self} with minimized={minimized} and maximized={maximized}')
         dpg_org.start_dearpygui()
 
+        logger.debug(f'[{self.__class__.__name__}] Finished viewport {self}')
         return self
 
     def __del__(self):
         """ Destroy the viewport.
         """
         dpg_org.destroy_context()
+        logger.debug(f'[{self.__class__.__name__}] Destroyed context')

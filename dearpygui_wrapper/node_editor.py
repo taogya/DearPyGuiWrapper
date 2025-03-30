@@ -2,8 +2,8 @@ import logging
 from enum import IntEnum
 from typing import Any, Callable, Self, cast
 
-from dearpygui_wrapper import (Container, DpgTag, Manager, Object, ValueObject,
-                               dpg_org, get_tag)
+from dearpygui_wrapper import (Container, DpgTag, Object, ValueObject, dpg_org,
+                               get_tag)
 
 logger = logging.getLogger('dgp_wrapper')
 
@@ -38,90 +38,106 @@ class NodeAttribute(Container):
             category (str, optional): Category
             id (Union[int, str], optional): (deprecated)
         """
+        self.attribute_type = NodeAttributeType(attribute_type)
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'indent': indent, 'parent': parent, 'before': before, 'show': show, 'filter_key': filter_key, 'tracked': tracked, 'track_offset': track_offset, 'attribute_type': attribute_type, 'shape': shape, 'category': category}
         super().__init__(**kwargs)
-        self.links: list[DpgTag] = []
+        self.links: dict[DpgTag, NodeAttribute] = {}
 
-    def add(self, obj: Object, manager: dict[DpgTag, Object] | None = None) -> Self:
-        """ Add object to the attribute.
+    def __getitem__(self, key: DpgTag) -> ValueObject:
+        return super().__getitem__(key)
 
-        Args:
-            obj (Object): object to add.
-            manager (dict[DpgTag, Object] | None, optional): tag manager. Defaults to None.
+    def default_tag(self) -> DpgTag:
+        return f'{self.__class__.__name__}({self.attribute_type.name})##{self.id}'
 
-        Raises:
-            ValueError: If the attribute already has an object.
-
-        Returns:
-            Self: own instance.
-        """
-        if self.objects:
-            raise ValueError(f'{self.__class__.__name__} can have only one object.')
-
-        super().add(obj, manager=manager)
-        if manager is not None:
-            manager[self.tag] = obj
-
-        return self
-
-    def add_link(self, link_id: DpgTag) -> Self:
+    def add_link(self, link: 'Link') -> Self:
         """ Add link to the attribute.
 
         Args:
-            link_id (DpgTag): link id.
+            link (Link): link object.
 
         Returns:
             Self: own instance.
         """
-        self.links.append(link_id)
+        match self.attribute_type:
+            case NodeAttributeType.INPUT:
+                self.links[link.tag] = link.out_attr
+                logger.debug(f'[{self.__class__.__name__}] Added {link.out_attr} of {link} to {self}')
+            case NodeAttributeType.OUTPUT:
+                self.links[link.tag] = link.in_attr
+                logger.debug(f'[{self.__class__.__name__}] Added {link.in_attr} of {link} to {self}')
+            case _:
+                pass
 
         return self
 
-    def remove_link(self, link_id: DpgTag) -> Self:
+    def remove_link(self, link: 'Link') -> Self:
         """ Remove link from the attribute.
 
         Args:
-            link_id (DpgTag): link id.
+            link (Link): link object.
 
         Returns:
             Self: own instance.
         """
-        self.links.remove(link_id)
+        del self.links[link.tag]
+        logger.debug(f'[{self.__class__.__name__}] Removed {link} from {self}')
 
         return self
 
-    def exists_link(self, link_id: DpgTag) -> bool:
-        """ Check if the link exists in the attribute.
+    def set_values(self, values: list[Any], call_callback: bool = True) -> Self:
+        """ Set value of the object.
 
         Args:
-            link_id (DpgTag): link id.
+            values (list[Any]): value to set.
+            call_callback (bool, optional): call callback. Defaults to True.
+        """
+        for _, obj in self:
+            cast(ValueObject, obj).set_values(values, call_callback=call_callback)
+
+        return self
+
+    def update_linked_object(self, call_callback: bool = True) -> Self:
+        """ Update linked object.
+
+        Args:
+            call_callback (bool, optional): Call callback. Defaults to True.
 
         Returns:
-            bool: True if the link exists, False otherwise.
+            Self: own instance.
         """
-        return link_id in self.links
+        match self.attribute_type:
+            case NodeAttributeType.INPUT:
+                values = [cast(ValueObject, obj).value
+                          for attr in self.links.values()
+                          for _, obj in attr]
+                self.set_values(values, call_callback=call_callback)
+            case NodeAttributeType.OUTPUT:
+                for attr in self.links.values():
+                    attr.update_linked_object(call_callback=call_callback)
+            case _:
+                pass
+
+        logger.debug(f'[{self.__class__.__name__}] Updated linked object {self}')
+        return self
 
     @property
-    def object(self) -> ValueObject:
-        """ Get object of the attribute.
+    def node(self) -> 'Node':
+        """ Get node of the attribute.
 
         Raises:
-            ValueError: If the attribute has no object.
+            ValueError: If the attribute has no node.
 
         Returns:
-            ValueObject: object of the attribute.
+            Node: node of the attribute.
         """
-        if not self.objects:
-            raise ValueError(f'{self.__class__.__name__} has no object.')
-
-        return cast(ValueObject, self.objects[0])
+        return self.parent
 
 
 class Link(Object):
     is_instance = True
     generator = staticmethod(dpg_org.add_node_link)
 
-    def __init__(self, attr_1: DpgTag, attr_2: DpgTag, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, parent: DpgTag = 0, show: bool = True):
+    def __init__(self, attr_1: NodeAttribute, attr_2: NodeAttribute, *, label: str | None = None, user_data: Any = None, use_internal_label: bool = True, tag: DpgTag = 0, parent: DpgTag = 0, show: bool = True):
         """	 Adds a node link between 2 node attributes.
 
         Args:
@@ -135,24 +151,35 @@ class Link(Object):
             show (bool, optional): Attempt to render widget.
             id (Union[int, str], optional): (deprecated)
         """
-        args = (attr_1, attr_2)
+        self.out_attr = attr_1
+        self.in_attr = attr_2
+        args = (self.out_attr.tag, self.in_attr.tag)
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'parent': parent, 'show': show}
         super().__init__(*args, **kwargs)
 
-    def build(self, parent: Object, manager: dict[DpgTag, Object], *args, **kwargs) -> Self:
+    def delete(self):
+        """ Delete the link.
+        """
+        super().delete()
+        self.out_attr.remove_link(self)
+        self.in_attr.remove_link(self)
+
+        logger.debug(f'[{self.__class__.__name__}] Deleted {self} from {self.out_attr} and {self.in_attr}')
+
+    def build(self, parent: 'NodeEditor', *args, **kwargs) -> Self:
         """ Build the object.
 
         Args:
             parent (Object): parent object.
-            manager (dict[DpgTag, Object]): tag manager.
 
         Returns:
             Self: own instance.
         """
-        super().build(parent, *args, manager=manager, **kwargs)
-        self.out_attr = cast(NodeAttribute, manager[self.args[0]]).add_link(self.tag)
-        self.in_attr = cast(NodeAttribute, manager[self.args[1]]).add_link(self.tag)
+        super().build(parent, *args, **kwargs)
+        self.out_attr.add_link(self)
+        self.in_attr.add_link(self)
 
+        logger.debug(f'[{self.__class__.__name__}] Linked {self.out_attr} to {self.in_attr} of {self}')
         return self
 
 
@@ -185,8 +212,44 @@ class Node(Container):
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'parent': parent, 'before': before, 'payload_type': payload_type, 'drag_callback': drag_callback, 'drop_callback': drop_callback, 'show': show, 'pos': pos, 'filter_key': filter_key, 'delay_search': delay_search, 'tracked': tracked, 'track_offset': track_offset, 'draggable': draggable}
         super().__init__(**kwargs)
 
+    def delete(self, *args, **kwargs):
+        """ Delete the container.
+        """
+        parent: NodeEditor = cast(NodeEditor, self.parent)
+        links = [
+            link
+            for _, link in parent
+            if isinstance(link, Link) and (link.out_attr.node.tag == self.tag or link.in_attr.node.tag == self.tag)
+        ]
+        for link in links:
+            parent.delink_callback(parent.tag, link.tag)
+        super().delete(*args, **kwargs)
+        del parent[self.tag]
 
-class NodeEditor(Manager):
+    def build(self, parent: 'NodeEditor', *args, **kwargs) -> Self:
+        """ Build the object.
+
+        Args:
+            parent (Object): parent object.
+
+        Returns:
+            Self: own instance.
+        """
+        super().build(parent, *args, **kwargs)
+
+        def delete(sender, app_data, user_data: DpgTag):
+            self.delete()
+            dpg_org.configure_item(user_data, show=False)
+
+        with dpg_org.popup(self.tag, mousebutton=dpg_org.mvMouseButton_Right) as tag:
+            dpg_org.add_button(label="delete", callback=delete, user_data=tag)
+        return self
+
+    def __getitem__(self, key: DpgTag) -> NodeAttribute:
+        return super().__getitem__(key)
+
+
+class NodeEditor(Container):
     is_instance = True
     generator = staticmethod(dpg_org.add_node_editor)
 
@@ -215,11 +278,29 @@ class NodeEditor(Manager):
             id (Union[int, str], optional): (deprecated)
         """
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'parent': parent, 'before': before, 'callback': callback, 'show': show, 'filter_key': filter_key, 'delay_search': delay_search, 'tracked': tracked, 'track_offset': track_offset, 'delink_callback': delink_callback, 'menubar': menubar, 'minimap': minimap, 'minimap_location': minimap_location}
-        kwargs.update({'callback': callback or self.__link_callback})
-        kwargs.update({'delink_callback': delink_callback or self.__delink_callback})
+        kwargs.update({'callback': callback or self.link_callback})
+        kwargs.update({'delink_callback': delink_callback or self.delink_callback})
         super().__init__(**kwargs)
 
-    def __link_callback(self, sender: DpgTag, app_data: tuple[DpgTag, DpgTag]):
+    def __getitem__(self, key: DpgTag) -> Node:
+        return super().__getitem__(key)
+
+    def __loop_check(self, attrs: list[NodeAttribute], target: NodeAttribute):
+        for attr in attrs:
+            parent: Node = attr.parent
+            if parent == target.node:
+                raise ValueError
+            input_attrs = [a
+                           for _, a in parent
+                           if isinstance(a, NodeAttribute)
+                           and a.attribute_type == NodeAttributeType.INPUT
+                           and len(a.links)]
+            linked_attrs = [la
+                            for a in input_attrs
+                            for la in a.links.values()]
+            self.__loop_check(linked_attrs, target)
+
+    def link_callback(self, sender: DpgTag, app_data: tuple[DpgTag, DpgTag]):
         """ Callback for link.
 
         Args:
@@ -228,15 +309,23 @@ class NodeEditor(Manager):
         """
         # fix https://github.com/hoffstadt/DearPyGui/issues/2122
         sender = get_tag(sender)
-        app_data = (get_tag(app_data[0]), get_tag(app_data[1]))
+        app_data_attrs: tuple[NodeAttribute] = (self[get_tag(app_data[0])], self[get_tag(app_data[1])])
 
-        parent = self.manager[sender]
-        link = Link(*app_data)\
-            .build(parent, manager=self.manager)
+        try:
+            self.__loop_check([app_data_attrs[0]], app_data_attrs[1])
+        except ValueError:
+            logger.warning(f'[{self.__class__.__name__}] Loop link detected: {app_data_attrs[0]} -> {app_data_attrs[1]}')
+            return
 
-        self.link_callback(link)
+        link = Link(*app_data_attrs).build(self)
+        self[link.tag] = link
 
-    def __delink_callback(self, sender: DpgTag, app_data: DpgTag):
+        link.out_attr.update_linked_object(call_callback=True)
+        link.in_attr.update_linked_object(call_callback=True)
+
+        logger.debug(f'[{self.__class__.__name__}] Linked {link.out_attr} to {link.in_attr} in {self}')
+
+    def delink_callback(self, sender: DpgTag, app_data: DpgTag):
         """ Callback for delink.
 
         Args:
@@ -247,74 +336,14 @@ class NodeEditor(Manager):
         sender = get_tag(sender)
         app_data = get_tag(app_data)
 
-        link = cast(Link, self.manager[app_data])
-        for attr in self.manager.values():
-            if isinstance(attr, NodeAttribute) and attr.exists_link(link.tag):
-                attr.remove_link(link.tag)
-        del self.manager[link.tag]
-        dpg_org.delete_item(link.tag)
+        link: Link = self[app_data]
+        link.delete()
+        del self[link.tag]
 
-        self.delink_callback(link)
+        link.out_attr.update_linked_object(call_callback=True)
+        link.in_attr.update_linked_object(call_callback=True)
 
-    def link_callback(self, link: Link):
-        """ Callback for link.
-
-        Args:
-            link (Link): link object.
-        """
-        pass
-
-    def delink_callback(self, link: Link):
-        """ Callback for delink.
-
-        Args:
-            link (Link): link object.
-        """
-        pass
-
-    def inject_based_on_out_attr(self, out_attr: NodeAttribute) -> Self:
-        """ Inject where connected based on output attribute.
-
-        Args:
-            out_attr (NodeAttribute): output attribute.
-
-        Returns:
-            Self: own instance.
-        """
-        for out_link_id in out_attr.links:
-            # get inject value
-            # ### [out_attr] -out_link_id-+-in_link_id> in_attr1
-            # ###                         |
-            # ###                         +-in_link_id> in_attr2
-            in_attr = cast(Link, self.manager[out_link_id]).in_attr
-            values = [
-                cast(Link, self.manager[in_link_id]).out_attr.object.value
-                for in_link_id in in_attr.links
-            ]
-            in_attr.object.set_values(values)
-
-        return self
-
-    def inject_based_on_in_attr(self, in_attr: NodeAttribute) -> Self:
-        """ Inject where connected based on input attribute.
-
-        Args:
-            in_attr (NodeAttribute): input attribute.
-
-        Returns:
-            Self: own instance.
-        """
-        # get inject value
-        # ### out_attr1 -+-link_id-> [in_attr]
-        # ###            |
-        # ### out_attr2 -+
-        values = [
-            cast(Link, self.manager[link_id]).out_attr.object.value
-            for link_id in in_attr.links
-        ]
-        in_attr.object.set_values(values)
-
-        return self
+        logger.debug(f'[{self.__class__.__name__}] Delinked {link.out_attr} from {link.in_attr} in {self}')
 
     def clear_selected_links(self):
         """ Clear selected links in the node editor.
@@ -332,8 +361,7 @@ class NodeEditor(Manager):
         Returns:
             list[Link]: Selected links.
         """
-        link_ids = cast(list[DpgTag], dpg_org.get_selected_links(self.tag))
-        return [cast(Link, self.manager[link_id]) for link_id in link_ids]
+        return [self[link_id] for link_id in dpg_org.get_selected_links(self.tag)]
 
     def get_selected_nodes(self) -> list[Node]:
         """ Get selected nodes in the node editor.
@@ -341,5 +369,64 @@ class NodeEditor(Manager):
         Returns:
             list[Node]: Selected nodes.
         """
-        node_ids = cast(list[DpgTag], dpg_org.get_selected_nodes(self.tag))
-        return [cast(Node, self.manager[node_id]) for node_id in node_ids]
+        return [self[node_id] for node_id in dpg_org.get_selected_nodes(self.tag)]
+
+    def get_nodeattr_from_object(self, tag: DpgTag) -> NodeAttribute:
+        """ Get node attribute from object tag.
+
+        Args:
+            tag (DpgTag): object tag.
+
+        Returns:
+            NodeAttribute: node attribute object.
+        """
+        return self[tag].parent
+
+    def get_node_from_object(self, tag: DpgTag) -> Node:
+        """ Get node from object tag.
+
+        Args:
+            tag (DpgTag): object tag.
+
+        Returns:
+            Node: node object.
+        """
+        return self.get_nodeattr_from_object(tag).node
+
+    def print_all(self, print_func=print):
+        """ Print all node editor tree.
+        """
+        print_func('# NodeEditor objects #####')
+        for tag, obj in self:
+            print_func(f'    {tag}: {obj}')
+        print_func('# Node objects #####')
+        for _, obj in self:
+            if isinstance(obj, Node):
+                for tag, o in obj:
+                    print_func(f'    {tag}: {o}')
+        print_func('# NodeAttribute objects #####')
+        for _, obj in self:
+            if isinstance(obj, NodeAttribute):
+                for tag, o in obj:
+                    print_func(f'    {tag}: {o}')
+
+    def print_node(self, print_func=print):
+        """ Print node editor tree.
+        """
+        print_func('# Node tree #####')
+        print_func(f'{self}')
+        for _, node in self:
+            if isinstance(node, Node):
+                print_func(f'    {node}')
+                for _, attr in node:
+                    if isinstance(attr, NodeAttribute):
+                        print_func(f'        {attr}')
+                        for _, obj in attr:
+                            if isinstance(obj, ValueObject):
+                                print_func(f'            {obj}')
+        print_func('# Link tree #####')
+        print_func(f'{self}')
+        for _, link in self:
+            if isinstance(link, Link):
+                print_func(f'    {link}')
+                print_func(f'        {link.out_attr} -> {link.in_attr}')

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Self
+from typing import Any, Iterator, Self
 
 from dearpygui_wrapper import DpgTag, dpg_org
 
@@ -34,12 +34,33 @@ class Object:
         self.kwargs = kwargs
         self.__is_build = False
 
-    def build(self, parent: 'Object | None', *args, manager: dict[DpgTag, 'Object'] | None = None, **kwargs) -> Self:
+    def __del__(self):
+        """ Destructor for the object.
+        """
+        try:
+            self.delete()
+        except KeyError:
+            pass
+
+    def delete(self, *args, **kwargs):
+        """ Delete the object.
+        """
+        try:
+            dpg_org.delete_item(self.tag)
+        except SystemError:
+            pass
+        except Exception:
+            logger.exception(f'[{self.__class__.__name__}] Failed to delete {self}')
+        logger.debug(f'[{self.__class__.__name__}] Deleted {self}')
+
+    def default_tag(self) -> DpgTag:
+        return f'{self.__class__.__name__}##{self.id}'
+
+    def build(self, parent: 'Object | None', *args, **kwargs) -> Self:
         """ Build the object.
 
         Args:
             parent (Object | None): parent object.
-            manager (dict[DpgTag, Object] | None, optional): tag manager. Defaults to None.
 
         Raises:
             ValueError: If the object is already built.
@@ -55,15 +76,20 @@ class Object:
         if parent is not None:
             self.kwargs.update({'parent': parent.tag})
 
-        self.tag = self.generator(*self.args, **self.kwargs)
+        tag = self.kwargs.pop('tag', 0)
+        self.id = self.generator(*self.args, **self.kwargs)
+        if tag == 0:
+            tag = self.default_tag()
+        self.tag = tag
+        dpg_org.add_alias(self.tag, self.id)
+        print(tag, self.tag, self.id, dpg_org.get_item_alias(self.tag), dpg_org.get_item_alias(self.id))
 
-        if manager is not None:
-            manager.update({self.tag: self})
-
+        logger.debug(f'[{self.__class__.__name__}] Built {self} in {parent}')
         return self
 
     def __str__(self) -> str:
-        return self.tag
+        tag = str(self.tag) if hasattr(self, 'tag') else f'{self.__class__.__name__} (not build yet)'
+        return f'<{tag}>'
 
 
 class ValueObject(Object):
@@ -85,13 +111,36 @@ class ValueObject(Object):
         """
         dpg_org.set_value(self.tag, value)
 
-    def set_values(self, values: list[Any]):
+    def conv_to_value(self, values: list[Any]) -> Any:
+        """ Convert values to a single value.
+
+        Args:
+            values (list[Any]): values to convert.
+
+        Returns:
+            Any: converted value.
+        """
+        raise NotImplementedError(f'{self.__class__.__name__} does not implement conv_to_value()')
+
+    def set_values(self, values: list[Any], call_callback: bool = True) -> Self:
         """ Set value of the object.
 
         Args:
             values (list[Any]): value to set.
+            call_callback (bool, optional): call callback. Defaults to True.
         """
-        raise NotImplementedError
+        value = self.conv_to_value(values)
+        self.value = value
+        logger.debug(f'[{self.__class__.__name__}] Set value of {self} to {value}')
+
+        if call_callback:
+            callback = dpg_org.get_item_callback(self.tag)
+            userdata = dpg_org.get_item_user_data(self.tag)
+            if callback:
+                callback(self.tag, value, userdata)
+                logger.debug(f'[{self.__class__.__name__}] Called callback of {self} with {value}')
+
+        return self
 
 
 class Container(Object):
@@ -99,38 +148,86 @@ class Container(Object):
         """ Abstract class for DearPyGui container object.
         """
         super().__init__(*args, **kwargs)
-        self.objects: list[Object] = []
+        self.__objects: dict[DpgTag, Object] = {}
+        self.__not_build_objects: list[Object] = []
 
-    def add(self, obj: Object, manager: dict[DpgTag, Object] | None = None) -> Self:
+    def __getitem__(self, key: DpgTag) -> Object:
+        """ Get object by tag.
+
+        Args:
+            key (DpgTag): tag of the object.
+
+        Returns:
+            Object: object with the tag.
+        """
+        return self.__objects[key]
+
+    def __setitem__(self, key: DpgTag, value: Object):
+        """ Set object by tag.
+
+        Args:
+            key (DpgTag): tag of the object.
+            value (Object): object to set.
+        """
+        self.__objects[key] = value
+        if isinstance(value, Container):
+            for _, o in value:
+                self.__objects[o.tag] = o
+
+    def __delitem__(self, key: DpgTag):
+        """ Delete object by tag.
+
+        Args:
+            key (DpgTag): tag of the object.
+        """
+        obj = self.__objects[key]
+        if isinstance(obj, Container):
+            for _, o in obj:
+                del self.__objects[o.tag]
+        del self.__objects[key]
+
+    def __iter__(self) -> Iterator[tuple[DpgTag, Object]]:
+        """ Iterate over the objects in the container.
+        """
+        return iter(self.__objects.items())
+
+    def __bool__(self):
+        return len(self.__objects) > 0
+
+    def delete(self, *args, **kwargs):
+        """ Delete the container.
+        """
+        for obj in self.__objects.values():
+            obj.delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
+
+    def add(self, obj: Object, *args, **kwargs) -> Self:
         """ Add object to the container.
 
         Args:
             obj (Object): object to add.
-            manager (dict[DpgTag, Object] | None, optional): tag manager. Defaults to None.
 
         Returns:
             Self: own instance.
         """
-        self.objects.append(obj)
-        if manager is not None:
-            manager[obj.tag] = self
+        if not hasattr(obj, 'tag'):
+            self.__not_build_objects.append(obj)
+        else:
+            self[obj.tag] = obj
 
+        logger.debug(f'[{self.__class__.__name__}] Added {obj}')
         return self
 
-    def remove(self, obj: Object, manager: dict[DpgTag, Object] | None = None) -> Self:
+    def remove(self, obj: Object, *args, **kwargs) -> Self:
         """ Remove object from the container.
 
         Args:
             obj (Object): object to remove.
-            manager (dict[DpgTag, Object] | None, optional): tag manager. Defaults to None.
 
         Returns:
             Self: own instance.
         """
-        self.objects.remove(obj)
-        if manager is not None:
-            del manager[obj.tag]
-
+        del self[obj.tag]
         return self
 
     def build(self, parent: Object | None, *args, **kwargs) -> Self:
@@ -143,20 +240,16 @@ class Container(Object):
             Self: own instance.
         """
         super().build(parent, *args, **kwargs)
-        for obj in self.objects:
+        for obj in self.__not_build_objects:
             obj.build(self, *args, **kwargs)
+            self[obj.tag] = obj
+        self.__not_build_objects.clear()
 
         return self
 
-
-class Manager(Container):
-    def __init__(self, *args, **kwargs):
-        """ Manager class for DearPyGui object.
+    def print(self, print_func=print):
+        """ Print the object.
         """
-        super().__init__(*args, **kwargs)
-        self.manager: dict[DpgTag, Object] = {}
-
-    def build(self, parent: Object | None, *args, **kwargs) -> Self:
-        super().build(parent, *args, manager=self.manager, **kwargs)
-
-        return self
+        print_func(f'# {self.__class__.__name__} objects #####')
+        for tag, obj in self:
+            print_func(f'{tag}: {obj}')
