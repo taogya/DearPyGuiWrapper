@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug",
+            "name": "DebugNodeEditor__Simple",
             "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
-            "program": "${workspaceFolder}/sample/node_editor.py",
+            "program": "${workspaceFolder}/sample/node_editor__simple.py",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             },
@@ -15,36 +15,17 @@
             "args": []
         },
         {
-            "name": "DebugMem",
+            "name": "DebugNodeEditor__Complex",
             "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
-            "program": "${workspaceFolder}/venv/bin/mprof",
-            "env": {
-                "MPLBACKEND": "module://backend_interagg",
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "cwd": "${workspaceFolder}/sample",
-            "justMyCode": false,
-            "args": [
-                "run",
-                "node_editor.py"
-            ],
-        },
-        {
-            "name": "MemPlot",
-            "type": "debugpy",
-            "request": "launch",
-            "console": "integratedTerminal",
-            "program": "${workspaceFolder}/venv/bin/mprof",
+            "program": "${workspaceFolder}/sample/node_editor__complex.py",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "cwd": "${workspaceFolder}/sample",
             "justMyCode": false,
-            "args": [
-                "plot"
-            ],
+            "args": []
         },
     ]
 }

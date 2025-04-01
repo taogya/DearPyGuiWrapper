@@ -42,6 +42,12 @@ class Object:
         except KeyError:
             pass
 
+    def __str__(self) -> str:
+        if hasattr(self, 'tag'):
+            return f'<{self.id}: {self.tag}>'
+        else:
+            return f'{self.__class__.__name__} (not build yet)'
+
     def delete(self, *args, **kwargs):
         """ Delete the object.
         """
@@ -56,24 +62,22 @@ class Object:
     def default_tag(self) -> DpgTag:
         return f'{self.__class__.__name__}##{self.id}'
 
-    def build(self, parent: 'Object | None', *args, **kwargs) -> Self:
+    def build(self, parent: 'Object | None' = None, **kwargs) -> Self:
         """ Build the object.
 
         Args:
-            parent (Object | None): parent object.
-
-        Raises:
-            ValueError: If the object is already built.
+            parent (Object | None, optional): parent object. Defaults to None.
 
         Returns:
             Self: own instance.
         """
         if self.__is_build:
-            raise ValueError(f'{self.__class__.__name__} is already built.')
+            return self
         self.__is_build = True
 
-        self.parent = parent
-        if parent is not None:
+        self.parent = None
+        if self.kwargs.get('parent') is not None and isinstance(parent, Object):
+            self.parent = parent
             self.kwargs.update({'parent': parent.tag})
 
         tag = self.kwargs.pop('tag', 0)
@@ -82,34 +86,17 @@ class Object:
             tag = self.default_tag()
         self.tag = tag
         dpg_org.add_alias(self.tag, self.id)
-        print(tag, self.tag, self.id, dpg_org.get_item_alias(self.tag), dpg_org.get_item_alias(self.id))
 
         logger.debug(f'[{self.__class__.__name__}] Built {self} in {parent}')
         return self
 
-    def __str__(self) -> str:
-        tag = str(self.tag) if hasattr(self, 'tag') else f'{self.__class__.__name__} (not build yet)'
-        return f'<{tag}>'
+    def print(self, print_func=print):
+        """ Print the object.
+        """
+        print_func(f'own={self}, parent={self.parent}')
 
 
 class ValueObject(Object):
-    @property
-    def value(self) -> Any:
-        """ Get value of the object.
-
-        Returns:
-            Any: value of the object.
-        """
-        return dpg_org.get_value(self.tag)
-
-    @value.setter
-    def value(self, value: Any):
-        """ Set value of the object.
-
-        Args:
-            value (Any): value to set.
-        """
-        dpg_org.set_value(self.tag, value)
 
     def conv_to_value(self, values: list[Any]) -> Any:
         """ Convert values to a single value.
@@ -141,6 +128,24 @@ class ValueObject(Object):
                 logger.debug(f'[{self.__class__.__name__}] Called callback of {self} with {value}')
 
         return self
+
+    @property
+    def value(self) -> Any:
+        """ Get value of the object.
+
+        Returns:
+            Any: value of the object.
+        """
+        return dpg_org.get_value(self.tag)
+
+    @value.setter
+    def value(self, value: Any):
+        """ Set value of the object.
+
+        Args:
+            value (Any): value to set.
+        """
+        dpg_org.set_value(self.tag, value)
 
 
 class Container(Object):
@@ -230,26 +235,19 @@ class Container(Object):
         del self[obj.tag]
         return self
 
-    def build(self, parent: Object | None, *args, **kwargs) -> Self:
-        """ Build the container.
+    def build(self, parent: Object | None = None, **kwargs) -> Self:
+        """ Build the object.
 
         Args:
-            parent (Object): parent object.
+            parent (Object | None, optional): parent object. Defaults to None.
 
         Returns:
             Self: own instance.
         """
-        super().build(parent, *args, **kwargs)
+        super().build(parent=parent, **kwargs)
         for obj in self.__not_build_objects:
-            obj.build(self, *args, **kwargs)
+            obj.build(parent=self, **kwargs)
             self[obj.tag] = obj
         self.__not_build_objects.clear()
 
         return self
-
-    def print(self, print_func=print):
-        """ Print the object.
-        """
-        print_func(f'# {self.__class__.__name__} objects #####')
-        for tag, obj in self:
-            print_func(f'{tag}: {obj}')

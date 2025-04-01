@@ -53,8 +53,13 @@ class Window(Object):
         kwargs = {'label': label, 'user_data': user_data, 'use_internal_label': use_internal_label, 'tag': tag, 'width': width, 'height': height, 'indent': indent, 'show': show, 'pos': pos, 'delay_search': delay_search, 'min_size': min_size, 'max_size': max_size, 'menubar': menubar, 'collapsed': collapsed, 'autosize': autosize, 'no_resize': no_resize, 'unsaved_document': unsaved_document, 'no_title_bar': no_title_bar, 'no_move': no_move, 'no_scrollbar': no_scrollbar, 'no_collapse': no_collapse, 'horizontal_scrollbar': horizontal_scrollbar, 'no_focus_on_appearing': no_focus_on_appearing, 'no_bring_to_front_on_focus': no_bring_to_front_on_focus, 'no_close': no_close, 'no_background': no_background, 'modal': modal, 'popup': popup, 'no_saved_settings': no_saved_settings, 'no_open_over_existing_popup': no_open_over_existing_popup, 'no_scroll_with_mouse': no_scroll_with_mouse, 'on_close': on_close}
         super().__init__(**kwargs)
 
-    def build(self, *args, **kwargs) -> 'Window':
-        super().build(None, *args, **kwargs)
+    def build(self, **kwargs) -> 'Window':
+        """ Builds the window.
+
+        Returns:
+            Window: own instance.
+        """
+        super().build(**kwargs)
         dpg_org.set_primary_window(self.tag, self.primary)
         if self.primary:
             logger.debug(f'[{self.__class__.__name__}] Set primary window {self}')
@@ -102,7 +107,7 @@ class ViewPort(Container):
         Returns:
             Self: own instance.
         """
-        super().build(None)
+        super().build(parent=None)
         dpg_org.setup_dearpygui()
         logger.debug(f'[{self.__class__.__name__}] Setup dearPyGui')
         dpg_org.show_viewport(minimized=minimized, maximized=maximized)
