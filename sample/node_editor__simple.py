@@ -30,20 +30,20 @@ logger = logging.getLogger('dgp_wrapper')
 class OutputNode(dpg.Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.add(dpg.NodeAttribute(attribute_type=dpg.NodeAttributeType.OUTPUT)
-                 .add(dpg.InputText(width=100, height=25, multiline=True, callback=self.input_callback))
+        self.add(dpg.OutputNodeAttribute()
+                 .add(dpg.InputText(width=100, height=25, multiline=True, callback=self.callback))
                  )
 
-    def input_callback(self, sender, app_data: str, user_data):
+    def callback(self, sender, app_data: str, user_data):
         editor: dpg.NodeEditor = self.parent
-        attr = editor.get_nodeattr_from_object(sender)
+        attr: dpg.OutputNodeAttribute = editor.get_nodeattr_from_object(sender)
         attr.update_linked_object()
 
 
 class InputNode(dpg.Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.add(dpg.NodeAttribute(attribute_type=dpg.NodeAttributeType.INPUT)
+        self.add(dpg.InputNodeAttribute()
                  .add(dpg.InputText(width=100, height=25, multiline=True, readonly=True))
                  )
 
@@ -54,13 +54,9 @@ class MyWindow(dpg.Window):
     def build(self, **kwargs) -> Self:
         super().build(**kwargs)
 
-        def input_callback(sender, app_data: str, user_data):
-            attr = self.editor.get_nodeattr_from_object(sender)
-            attr.update_linked_object()
-
         self.editor = dpg.NodeEditor()\
             .add(dpg.Node(pos=[0, 0])
-                 .add(dpg.NodeAttribute(attribute_type=dpg.NodeAttributeType.STATIC)
+                 .add(dpg.StaticNodeAttribute()
                       .add(dpg.Button(label='print_objects', callback=lambda: self.editor.print_objects(logger.debug)))
                       .add(dpg.Button(label='print node', callback=lambda: self.editor.print_node(logger.debug)))
                       .add(dpg.Button(label='add output', callback=lambda: self.editor.add(OutputNode(pos=[0, 0])).build()))

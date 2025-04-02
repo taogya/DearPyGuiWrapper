@@ -48,17 +48,6 @@ class Object:
         else:
             return f'{self.__class__.__name__} (not build yet)'
 
-    def delete(self, *args, **kwargs):
-        """ Delete the object.
-        """
-        try:
-            dpg_org.delete_item(self.tag)
-        except SystemError:
-            pass
-        except Exception:
-            logger.exception(f'[{self.__class__.__name__}] Failed to delete {self}')
-        logger.debug(f'[{self.__class__.__name__}] Deleted {self}')
-
     def default_tag(self) -> DpgTag:
         return f'{self.__class__.__name__}##{self.id}'
 
@@ -90,6 +79,17 @@ class Object:
         logger.debug(f'[{self.__class__.__name__}] Built {self} in {parent}')
         return self
 
+    def delete(self, *args, **kwargs):
+        """ Delete the object.
+        """
+        try:
+            dpg_org.delete_item(self.tag)
+        except SystemError:
+            pass
+        except Exception:
+            logger.exception(f'[{self.__class__.__name__}] Failed to delete {self}')
+        logger.debug(f'[{self.__class__.__name__}] Deleted {self}')
+
     def print(self, print_func=print):
         """ Print the object.
         """
@@ -98,25 +98,25 @@ class Object:
 
 class ValueObject(Object):
 
-    def conv_to_value(self, values: list[Any]) -> Any:
+    def conv_to_value(self, objects: list[Object]) -> Any:
         """ Convert values to a single value.
 
         Args:
-            values (list[Any]): values to convert.
+            objects (list[Object]): objects to set value from.
 
         Returns:
             Any: converted value.
         """
         raise NotImplementedError(f'{self.__class__.__name__} does not implement conv_to_value()')
 
-    def set_values(self, values: list[Any], call_callback: bool = True) -> Self:
+    def set_values(self, objects: list[Object], call_callback: bool = True) -> Self:
         """ Set value of the object.
 
         Args:
-            values (list[Any]): value to set.
+            objects (list[Object]): objects to set value from.
             call_callback (bool, optional): call callback. Defaults to True.
         """
-        value = self.conv_to_value(values)
+        value = self.conv_to_value(objects)
         self.value = value
         logger.debug(f'[{self.__class__.__name__}] Set value of {self} to {value}')
 
@@ -176,7 +176,7 @@ class Container(Object):
         """
         self.__objects[key] = value
         if isinstance(value, Container):
-            for _, o in value:
+            for o in value:
                 self.__objects[o.tag] = o
 
     def __delitem__(self, key: DpgTag):
@@ -187,24 +187,33 @@ class Container(Object):
         """
         obj = self.__objects[key]
         if isinstance(obj, Container):
-            for _, o in obj:
+            for o in obj:
                 del self.__objects[o.tag]
         del self.__objects[key]
 
-    def __iter__(self) -> Iterator[tuple[DpgTag, Object]]:
+    def __iter__(self) -> Iterator[Object]:
         """ Iterate over the objects in the container.
         """
-        return iter(self.__objects.items())
+        return iter(self.__objects.values())
+
+    def __len__(self) -> int:
+        """ Get the number of objects in the container.
+        """
+        return len(self.__objects)
+
+    def __contains__(self, item: DpgTag) -> bool:
+        """ Check if the container contains the object with the tag.
+
+        Args:
+            item (DpgTag): tag of the object.
+
+        Returns:
+            bool: True if the container contains the object, False otherwise.
+        """
+        return item in self.__objects
 
     def __bool__(self):
-        return len(self.__objects) > 0
-
-    def delete(self, *args, **kwargs):
-        """ Delete the container.
-        """
-        for obj in self.__objects.values():
-            obj.delete(*args, **kwargs)
-        super().delete(*args, **kwargs)
+        return len(self) > 0
 
     def add(self, obj: Object, *args, **kwargs) -> Self:
         """ Add object to the container.
@@ -247,7 +256,14 @@ class Container(Object):
         super().build(parent=parent, **kwargs)
         for obj in self.__not_build_objects:
             obj.build(parent=self, **kwargs)
-            self[obj.tag] = obj
+            self.add(obj)
         self.__not_build_objects.clear()
 
         return self
+
+    def delete(self, *args, **kwargs):
+        """ Delete the container.
+        """
+        for obj in self:
+            obj.delete(*args, **kwargs)
+        super().delete(*args, **kwargs)

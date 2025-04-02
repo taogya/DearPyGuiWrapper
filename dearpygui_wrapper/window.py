@@ -59,7 +59,7 @@ class Window(Object):
         Returns:
             Window: own instance.
         """
-        super().build(**kwargs)
+        super().build()
         dpg_org.set_primary_window(self.tag, self.primary)
         if self.primary:
             logger.debug(f'[{self.__class__.__name__}] Set primary window {self}')
@@ -107,7 +107,7 @@ class ViewPort(Container):
         Returns:
             Self: own instance.
         """
-        super().build(parent=None)
+        super().build()
         dpg_org.setup_dearpygui()
         logger.debug(f'[{self.__class__.__name__}] Setup dearPyGui')
         dpg_org.show_viewport(minimized=minimized, maximized=maximized)
